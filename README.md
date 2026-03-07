@@ -4,29 +4,7 @@ Comprehensive probabilistic framework for forecasting infectious disease dynamic
 
 This package provides two complementary model variants:
 - **ClassicalForecaster**: Non-spatial model for single or aggregated regions
-- **SpatialForecaster**: Spatial model for multiple connected regions with human moibility
-
-## Features
-
-### Classical Model
-- **Renewal Equation Framework**: Models disease transmission with various infection dynamics
-- **Flexible Infection Models**: Basic, Feedback, and Logistic susceptible (Logistic_S) options
-- **Wastewater Integration**: Leverages wastewater concentration data to improve forecasts
-- **Hospital Admission Forecasting**: Predicts hospitalization counts using delay distributions
-- **Hierarchical Modeling**: Region-level heterogeneity with shared hyperparameters
-
-### Spatial Model
-- **Multi-region Dynamics**: Models disease transmission across connected spatial regions
-- **Spatial Spillover**: Captures disease movement between adjacent regions via adjacency matrices
-- **Vectorized Operations**: Efficient JAX-based computation across regions simultaneously
-- **Network-based**: Integrates spatial networks (e.g., NetworkX graphs) for region connectivity
-- **Wastewater Covariate**: Incorporates WW signals per region to modulate transmission
-
-### Shared Features
-- **JAX/NumPyro Backend**: Fast, scalable MCMC inference with JAX through NumPyro
-- **Vectorized Computation**: Efficient NumPyro/JAX operations for large datasets
-- **Posterior Predictive Sampling**: Full uncertainty quantification for forecasts
-- **Flexible Data Integration**: Handle hospital admissions, wastewater, or both
+- **SpatialForecaster**: Spatial model for multiple connected regions with human mobility/commuting
 
 ## Installation
 
