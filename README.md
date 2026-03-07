@@ -3,8 +3,8 @@
 Probabilistic framework for forecasting infectious disease dynamics using Bayesian renewal equations.
 
 This package provides two complementary model variants:
-- **ClassicalForecaster**: Non-spatial model for single or aggregated regions
-- **SpatialForecaster**: Spatial model for multiple connected regions with human mobility/commuting
+- **ClassicalForecaster [designed by CDC]**: Non-spatial model for single or aggregated regions
+- **SpatialForecaster [designed in our study]**: Spatial model for multiple connected regions with human mobility/commuting
 
 ## Installation
 
