@@ -1,4 +1,4 @@
-# Bayesian Renewal Models for Infectious Disease Forecasting
+# Spatial Bayesian Renewal Models for Infectious Disease Forecasting 
 
 Comprehensive probabilistic framework for forecasting infectious disease dynamics using Bayesian renewal equations with wastewater surveillance data.
 
