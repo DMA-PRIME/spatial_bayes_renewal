@@ -4,7 +4,7 @@ Probabilistic framework for forecasting infectious disease dynamics using Bayesi
 
 This package provides two complementary model variants:
 - **ClassicalForecaster [designed by CDC]**: Non-spatial model for single or aggregated regions
-- **SpatialForecaster [designed in our study]**: Spatial model for multiple connected regions with human mobility/commuting
+- **SpatialForecaster [designed in our study]**: Spatial model for multiple regions with spatial coupling
 
 ## Installation
 
