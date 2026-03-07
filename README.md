@@ -4,7 +4,7 @@ Comprehensive probabilistic framework for forecasting infectious disease dynamic
 
 This package provides two complementary model variants:
 - **ClassicalForecaster**: Non-spatial model for single or aggregated regions
-- **SpatialForecaster**: Spatial model for multiple connected regions with spillover effects
+- **SpatialForecaster**: Spatial model for multiple connected regions with human moibility
 
 ## Features
 
