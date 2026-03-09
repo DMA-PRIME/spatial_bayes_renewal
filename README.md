@@ -175,20 +175,20 @@ df_data: DataFrame with columns
 | Regions | Single/aggregate | Multiple |
 | Spatial Effects | No | Yes (adjacency matrix) |
 | Wastewater | Yes | Yes (per region) |
-| Scalability | Very high | High (linear in regions) |
-| Inference Speed | Fast | Medium |
-| Complexity | Simple | Moderate |
+| Scalability | high | High  |
+| Inference Speed | Slow if for each region | Fast |
+| Complexity | High if for each region | Moderate |
 
 **Choose Classical when:**
 - Analyzing a single city/region
-- Need fast inference with limited data
-- Spatial effects are negligible
+- Spatial effects are not available
 
 **Choose Spatial when:**
 - Multiple regions with connections
 - Need to account for cross-region transmission
-- Have region-level wastewater data
+- Have region-level biased wastewater data
 - Building a regional forecasting system
+- Data is sparse and limited
 
 ## Output
 
@@ -205,84 +205,26 @@ samples, predictions = forecaster.run_mcmc()
 #   Values: Arrays of shape (num_samples, forecast_len, ...)
 ```
 
-## Usage Examples
-
-### Plot Hospital Admissions Forecast
-
-```python
-# Classical model
-forecaster.plot_results(
-    df_data_all=your_data,
-    strx='hosp_obs',
-    strx_label='Hospital Admissions',
-    fig_path='forecast.png',
-    show_forecast=True,
-    show_log=False
-)
-```
-
-### Extract Posterior Summary
-
-```python
-import numpy as np
-
-# Get posterior R(t) estimates
-R_post = samples['R_t']
-R_median = np.median(R_post, axis=0)
-R_hpd = np.percentile(R_post, [2.5, 97.5], axis=0)
-
-print(f"R(t) = {R_median} [{R_hpd[0]}, {R_hpd[1]}]")
-```
-
-### Warm-start with Previous Results
-
-```python
-# Use previous posterior samples as initialization
-samples, pred = forecaster.run_mcmc(init_params=previous_samples)
-```
-
-## Requirements
-
-- Python >= 3.9
-- numpy
-- polars
-- jax >= 0.3.0
-- jaxlib >= 0.3.0
-- numpyro >= 0.10.0
-- matplotlib
-
-## Contributing
-
-Contributions welcome! Areas for enhancement:
-- Additional infection dynamics models
-- GPU acceleration
-- Approximate Bayesian computation (ABC) variants
-- More flexible spatial models
-- Joint inference across diseases
-
 ## Citation
 
 If you use this package, please cite:
 
 ```bibtex
 @software{luzhong2024bayesian,
-  title={Bayesian Renewal Models for Infectious Disease Forecasting},
-  author={LuZhong},
-  year={2024},
-  url={https://github.com/...}
+  title={Bayesian Renewal Models xxxxx},
+  author={LuZhong, xxxxx},
+  year={2026},
+  journal={xxx}
 }
 ```
 
-## References
-
-- Gostic et al. (2020). "Potential for large outbreaks of coronavirus disease 2019." *The Lancet Infectious Diseases*.
-- Viboud & Vall-Spasos (2021). "Ranking the effectiveness of worldwide COVID-19 government interventions."
-- Bhatt et al. (2008). "The Global Distribution and Burden of Dengue." *Nature*.
+## Acknowledgement
+This work is supproted by DMA-PRIME (CDC/CFA Insight Net Center of Integration)
 
 ## License
 
 MIT License - see LICENSE file for details
 
-## Support
 
-For issues, questions, or feature requests, please open an issue on GitHub or contact the development team.
+
+
