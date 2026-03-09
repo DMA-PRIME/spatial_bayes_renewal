@@ -136,8 +136,8 @@ where:
 ```python
 df_data_train: DataFrame with columns
   - 'hosp_obs': Hospital admissions (1D array)
-  - 'ww_obs': Wastewater concentration (1D array)
-  - 'ed_obs': (optional) Emergency department visits
+  - 'ww_obs':(optional)  Wastewater concentration (1D array)
+  - 'pop': Population per region
 ```
 
 ### Spatial Model Input
@@ -145,8 +145,9 @@ df_data_train: DataFrame with columns
 df_data: DataFrame with columns
   - 'county': Region identifier
   - 'hosp_obs': Hospital admissions per region
-  - 'ww_obs': Wastewater concentration per region
-  - 'date': (optional) Temporal index
+  - 'ww_obs': (optional)  Wastewater concentration per region
+  - 'G': Spatial network connecting regions
+  - 'pop': Population per region
 ```
 
 ## Key Parameters
