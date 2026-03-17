@@ -202,17 +202,25 @@ class SpatialForecaster:
                         [jnp.array([0.0], dtype=jnp.float32),
                          jnp.diff(ww)]
                     )
-                    ww_cov = q  # shape (T,)
+                    ww_cov = ww_delta * q  # shape (T,)
 
-                    ww_cov = jnp.concatenate(
-                        [jnp.zeros(self.delay_ww, dtype=jnp.float32),
-                         ww_cov[:-self.delay_ww]]
-                    )
+                    # Apply temporal delay: guard against delay_ww=0 (ww_cov[:-0] == ww_cov[:0] is empty)
+                    if self.delay_ww > 0:
+                        ww_cov = jnp.concatenate(
+                            [jnp.zeros(self.delay_ww, dtype=jnp.float32),
+                             ww_cov[:-self.delay_ww]]
+                        )
 
                     ww_cov_full = jnp.concatenate(
                         [jnp.zeros(self.n_previous_points, dtype=jnp.float32),
                          ww_cov]
                     )
+
+                    # Pad to length T with zeros if needed (e.g., during prediction with extended horizon)
+                    if ww_cov_full.shape[0] < T:
+                        ww_cov_full = jnp.concatenate(
+                            [ww_cov_full, jnp.zeros(T - ww_cov_full.shape[0], dtype=jnp.float32)]
+                        )
 
                     # add wastewater drift to log R for this region
                     logR_all = logR_all.at[:, region_idx].add(beta_ww * ww_cov_full)
@@ -365,11 +373,13 @@ class SpatialForecaster:
         R = self.R_t_func(T)
         I0 = numpyro.sample("I0", dist.LogNormal(jnp.log(self.set_I0), jnp.log(1.5)))
 
-
         I = self.latent_infection_func(R, I0, T, self.N_regions)
 
         if "hosp_obs" in self.cols_concern:
             self.Hosptial_admission_model(T, I, hosp_obs_v)
+
+        if "ww_obs" in self.cols_concern:
+            self.waste_water_model(T, I, ww_obs_v)
 
 
     def run_mcmc(self, init_params=None):
