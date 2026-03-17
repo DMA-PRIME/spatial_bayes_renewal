@@ -99,14 +99,15 @@ class ClassicalForecaster:
 
     def R_t_func(self, T):
         R0 = numpyro.sample("R0", dist.TruncatedNormal(loc=self.set_R0, scale=0.1, low=0.0))
-        eps = numpyro.sample("rw_steps", dist.Normal(loc=self.set_eps, scale=0.005))
+        # Use jnp.zeros(T) directly to avoid shape mismatch when T differs from self.T + n_previous_points
+        eps = numpyro.sample("rw_steps", dist.Normal(loc=jnp.zeros(T), scale=0.005))
 
         beta_ww = numpyro.sample("beta_ww", dist.Normal(0.01, 0.05))
         beta_ww = jnp.clip(beta_ww, 0, 0.5)
 
         R_t = jnp.zeros((T,))
         R_t = R_t.at[0].set(R0)
-   
+
         if self.ww_obs is not None:
             ww = jnp.asarray(self.ww_obs, dtype=jnp.float32)
 
@@ -122,24 +123,32 @@ class ClassicalForecaster:
                 [jnp.array([0.0], dtype=jnp.float32),
                  jnp.diff(ww)]
             )
-            ww_cov= ww_delta * q  # shape (T,)
+            ww_cov = ww_delta * q  # shape (T,)
 
-            ww_cov = jnp.concatenate(
-                [jnp.zeros(self.delay_ww, dtype=jnp.float32),
-                 ww_cov[:-self.delay_ww]]
-            )
+            # Apply temporal delay: guard against delay_ww=0 (ww_cov[:-0] == ww_cov[:0] is empty)
+            if self.delay_ww > 0:
+                ww_cov = jnp.concatenate(
+                    [jnp.zeros(self.delay_ww, dtype=jnp.float32),
+                     ww_cov[:-self.delay_ww]]
+                )
 
             ww_cov = jnp.concatenate(
                 [jnp.zeros(self.n_previous_points, dtype=jnp.float32),
                  ww_cov]
             )
 
+            # Pad to length T with zeros if needed (e.g., during prediction with extended horizon)
+            if ww_cov.shape[0] < T:
+                ww_cov = jnp.concatenate(
+                    [ww_cov, jnp.zeros(T - ww_cov.shape[0], dtype=jnp.float32)]
+                )
+
         else:
             ww_cov = jnp.zeros(T, dtype=jnp.float32)
 
         for t in range(1, T):
-            drift =  beta_ww*ww_cov[t]
-            R_t_here = jnp.clip(jnp.exp(jnp.log(R_t[t - 1])) + eps[t - 1]+ drift , 0.01, 3.0)
+            drift = beta_ww * ww_cov[t]
+            R_t_here = jnp.clip(jnp.exp(jnp.log(R_t[t - 1])) + eps[t - 1] + drift, 0.01, 3.0)
             R_t = R_t.at[t].set(R_t_here)
 
         numpyro.deterministic("R_t", R_t)
@@ -152,7 +161,7 @@ class ClassicalForecaster:
         I = I.at[0].set(I0)
 
         if self.Renewal_infection_case == 'Basic':
-            '''
+            r'''
             Renewal Model:
             I(t)=R(t) \times \sum_{\tau\lt t} I(\tau) g(t-\tau)
             '''
@@ -165,7 +174,7 @@ class ClassicalForecaster:
 
 
         if self.Renewal_infection_case == 'Feedback':
-            '''
+            r'''
             Renewal Model:
             I(t)=R(t) \times \sum_{\tau\lt t} I(t-\tau) g(-\tau) ;
             R(t)=R^u(t)exp(-\gamma(t)\sum_{\tau}  I(I-\tau) f(\tau)) ;
@@ -213,7 +222,7 @@ class ClassicalForecaster:
         return I
 
     def Hosptial_admission_model(self, T, I, hosp_obs_v=None,weight=None):
-        '''
+        r'''
         Hospital Admission Model:
         h(t)~NegativeBinomial (mean=H(t), concentration=k) ;
         H(t)=P_{hosp}(t) \sum_\tau d(\tau) I(t-\tau) ;
@@ -239,7 +248,7 @@ class ClassicalForecaster:
 
 
     def waste_water_model(self, T, I, ww_obs_v=None,weight=None):
-        '''
+        r'''
         Waste water Model:
         log(c_t) ~ Normal (C(t),sigma_c) ;
         C(t)=G \sum_\tau s(\tau) I(t-\tau) ;
@@ -266,7 +275,7 @@ class ClassicalForecaster:
 
 
     def model_test(self, T, R_input=None,hosp_obs_v=None, ww_obs_v=None):
-        if R_input==None:
+        if R_input is None:
             self.R_t  = self.R_t_func(T)
         else:
             self.R_t = R_input
