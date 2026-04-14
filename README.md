@@ -7,7 +7,7 @@ This package provides two complementary model variants:
 - **SpatialForecaster [designed in our study]**: Spatial model for multiple regions with spatial coupling
 
 ## Installation
-
+xxxxx
 ### Install from source
 
 ```bash
