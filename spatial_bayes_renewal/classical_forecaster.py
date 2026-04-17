@@ -15,7 +15,7 @@ from jax import lax
 
 class ClassicalForecaster:
     """
-    Classical (non-spatial) Bayesian Renewal Model for forecasting infectious disease dynamics.
+    Classical Bayesian Renewal Model for forecasting infectious disease dynamics.
     
     This model captures disease transmission in a single or aggregated region with various
     infection dynamics options (Basic, Feedback, Logistic_S).
@@ -40,7 +40,6 @@ class ClassicalForecaster:
         self.data_path = data_path
 
         self.hosp_obs = None
-        self.ed_obs = None
         self.ww_obs = None
 
         self.sheddin = None
@@ -48,7 +47,7 @@ class ClassicalForecaster:
         self.inf_hosp_array = None
         self.feedback_pmf = None
         self.pop = pop
-        self.n_previous_points = 10
+        self.n_previous_points = 10 # number of previous points to consider for convolution (can be adjusted based on data)
         self.delay_ww=0
 
         for col in cols_concern:
@@ -212,7 +211,7 @@ class ClassicalForecaster:
         numpyro.deterministic("I_t", I)
         return I
 
-    def Hosptial_admission_model(self, T, I, hosp_obs_v=None,weight=None):
+    def Hosptial_admission_model(self, T, I, hosp_obs_v=None):
         '''
         Hospital Admission Model:
         h(t)~NegativeBinomial (mean=H(t), concentration=k) ;
@@ -231,56 +230,22 @@ class ClassicalForecaster:
         numpyro.deterministic("H_t", H)
 
         k_hosp = numpyro.sample("k_hosp", dist.LogNormal(loc=jnp.log(0.5), scale=jnp.log(10)))
-        if weight is not None and hosp_obs_v is not None:
-            log_lik = dist.NegativeBinomial2(mean=H, concentration=k_hosp).log_prob(hosp_obs_v)
-            numpyro.factor("hosp_downweighted", weight * jnp.sum(log_lik))
-        else:
-            numpyro.sample("hosp_obs", dist.NegativeBinomial2(mean=H, concentration=k_hosp), obs=hosp_obs_v)
-
-
-    def waste_water_model(self, T, I, ww_obs_v=None,weight=None):
-        '''
-        Waste water Model:
-        log(c_t) ~ Normal (C(t),sigma_c) ;
-        C(t)=G \sum_\tau s(\tau) I(t-\tau) ;
-        '''
-        G = numpyro.sample("G", dist.LogNormal(jnp.log(self.set_G), 0.2))
-
-        W = G * jnp.convolve(I, self.sheddin, mode="full")
-        W = jnp.log(W) / jnp.log(2)
-        W = W[self.n_previous_points:-len(self.sheddin) + 1]
-        numpyro.deterministic("W_t", W)
-
-        k_ww = numpyro.sample("k_ww", dist.LogNormal(loc=jnp.log(0.5), scale=jnp.log(10)))
-
-        if weight is not None and ww_obs_v is not None:
-            q_raw = numpyro.sample("q_raw_ww", dist.Normal(0.5, 0.5).expand([W.shape[0]]))
-            q_t = jnp.clip(q_raw,0,1)
-
-            log_lik = dist.Normal(loc=W, scale=k_ww).log_prob(ww_obs_v)
-            numpyro.factor("ww_downweighted", weight * jnp.sum(q_t*log_lik))
-        else:
-            numpyro.sample("ww_obs", dist.Normal(loc=W, scale=k_ww), obs=ww_obs_v)
-
+        #if weight is not None or self.hosp_obs is None:
+         #   log_lik = dist.NegativeBinomial2(mean=H, concentration=k_hosp).log_prob(hosp_obs_v)
+        #    numpyro.factor("hosp_downweighted", weight * jnp.sum(log_lik))
+        #else:
+        numpyro.sample("hosp_obs", dist.NegativeBinomial2(mean=H, concentration=k_hosp), obs=hosp_obs_v)
 
 
 
     def model_test(self, T, R_input=None,hosp_obs_v=None, ww_obs_v=None):
-        if R_input==None:
-            self.R_t  = self.R_t_func(T)
-        else:
-            self.R_t = R_input
-            numpyro.sample("R_t", dist.Normal(loc=R_input, scale=0.1))
+        self.R_t  = self.R_t_func(T)
+
 
         I0 = numpyro.sample("I0", dist.LogNormal(loc=jnp.log(self.set_I0), scale=jnp.log(1.75)))
         self.I_t = self.latent_infection_func(self.R_t, I0, T)
 
-
-        if 'ww_obs' in self.cols_concern:
-            self.waste_water_model(T, self.I_t, ww_obs_v,weight=0.5)
-
-        if 'hosp_obs' in  self.cols_concern:
-            self.Hosptial_admission_model(T, self.I_t, hosp_obs_v,weight=0.8)
+        self.Hosptial_admission_model(T, self.I_t, hosp_obs_v)
 
 
     def run_mcmc(self,init_params=None):
@@ -324,67 +289,3 @@ class ClassicalForecaster:
         self.post_pred = post_pred
 
         return self.posterior_samples, self.post_pred
-
-    def plot_results(self, df_data_all, strx, strx_label, fig_path, show_forecast, show_log):
-        print('cols_concern', self.cols_concern)
-        pred_mean = np.mean(self.post_pred[strx], axis=0)
-        pred_median = np.percentile(self.post_pred[strx], 50, axis=0)
-        pred_hpd = np.percentile(self.post_pred[strx], [2.5, 97.5], axis=0)
-
-        fig, ax = plt.subplots(figsize=(6, 4))
-
-        time = np.arange(len(df_data_all))
-
-        ax.scatter(time, df_data_all[strx], label="Data", color='black')
-        if show_forecast == True:
-            ax.plot(time, pred_mean, label="Predict Mean", color='C0')
-            ax.fill_between(time, pred_hpd[0], pred_hpd[1], color="C0", alpha=0.3,
-                            label="Predict (95% credible interval)")
-
-        ax.axvline(x=int(self.T), color='k', linestyle='--', label='Test/Training split')
-        ax.legend()
-        ax.set_xlabel("Time", fontsize=10)
-        ax.set_ylabel(strx_label, fontsize=10)
-
-        if show_log == True:
-            ax.set_yscale('log')
-        ax.set_title(strx_label)
-
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(fig_path)
-
-    def plot_posterior_results(self, strx, strx_label, fig_path):
-        pred_mean = np.mean(self.posterior_samples[strx], axis=0)
-        pred_median = np.percentile(self.posterior_samples[strx], 50, axis=0)
-        pred_hpd = np.percentile(self.posterior_samples[strx], [2.5, 97.5], axis=0)
-        fig, ax = plt.subplots(figsize=(6, 4))
-
-        time = np.arange(self.T)
-        n_cut = self.n_previous_points
-        ax.plot(time, pred_median[n_cut:], label="Posterior Mean", color='C0')
-        ax.fill_between(time, pred_hpd[0][n_cut:], pred_hpd[1][n_cut:], color="C0", alpha=0.3,
-                        label="Posterior (95% credible interval)")
-        ax.set_xlabel("Time", fontsize=10)
-        ax.set_ylabel(strx_label, fontsize=10)
-        ax.set_title(strx_label)
-        ax.set_xlim(7, len(time))
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(fig_path)
-
-    def sum_every_n_elements(self,input_list, n):
-        """
-        Calculates the sum of every n elements in a list.
-
-        Args:
-            input_list: The list of numbers to process.
-            n: The interval at which to sum the elements.
-
-        Returns:
-            A list containing the sums of each n-element sublist.
-        """
-        if n <= 0:
-            raise ValueError("Interval 'n' must be a positive integer.")
-
-        return jnp.array([jnp.sum(input_list[i:i+n]) for i in range(0, len(input_list), n)])

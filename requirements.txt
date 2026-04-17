@@ -1,6 +1,0 @@
-numpy>=1.21.0
-polars>=0.18.0
-jax>=0.3.0
-jaxlib>=0.3.0
-numpyro>=0.10.0
-matplotlib>=3.5.0

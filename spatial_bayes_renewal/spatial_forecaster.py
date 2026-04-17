@@ -29,10 +29,11 @@ class SpatialForecaster:
         spatial_net,
         region_list,
         region_obs_list,
+        region_ww_obs_list, 
         cols_concern,
         n_forecast_points,
         data_path,
-        Renewal_infection_case='Basic',
+        Rt_mode='Global',
         num_samples=200,
         num_warmup=100,
         num_chains=1,
@@ -43,8 +44,10 @@ class SpatialForecaster:
         self.spatial_net = spatial_net
         self.region_list = region_list
         self.region_obs_list = region_obs_list
-        self.region_ww_obs_list=region_obs_list
+        self.region_ww_obs_list=region_ww_obs_list
         self.region_pop=None
+
+        self.Rt_mode=Rt_mode
 
         self.n_forecast_points = int(n_forecast_points)
         self.data_path = data_path
@@ -61,7 +64,7 @@ class SpatialForecaster:
             if col == 'hosp_obs':
                 blk = []
                 for region in self.region_obs_list:
-                    df = df_data.filter(pl.col('county') == region)
+                    df = df_data[df_data['Region'] == region]
                     blk.append(df[col].to_numpy().astype(np.float32).ravel())
                 self.hosp_obs = np.vstack(blk)
                 self.N_obs_regions, self.T = self.hosp_obs.shape
@@ -69,7 +72,7 @@ class SpatialForecaster:
             if col == 'ww_obs':
                 blk = []
                 for region in self.region_ww_obs_list:
-                    df = df_data.filter(pl.col('county') == region)
+                    df = df_data[df_data['Region'] == region]
                     blk.append(df[col].to_numpy().astype(np.float32).ravel())
                 self.ww_obs = np.vstack(blk)
                 self.N_obs_regions, self.T = self.ww_obs.shape
@@ -88,31 +91,11 @@ class SpatialForecaster:
         self.set_R0 = 1.2
         self.set_P_hosp = 0.1
         self.set_G = 1.0
-        self.delay_ww=1
+        self.delay_ww=14
+        self.temporal_weights=[0.3,1]
 
         # Build adjacency matrix for spatial vectorization
         self.adj_matrix = self._build_adjacency_matrix(spatial_net, region_list)
-
-    def update_training_data(self, df_data_train):
-        """Update internal arrays when new training data arrive."""
-        self.df_data_train = df_data_train
-
-        for col in self.cols_concern:
-            if col == 'hosp_obs':
-                blk = []
-                for region in self.region_obs_list:
-                    df = df_data_train[df_data_train['county'] == region]
-                    blk.append(df[col].to_numpy().astype(np.float32).ravel())
-                self.hosp_obs = np.vstack(blk)
-                self.N_obs_regions, self.T = self.hosp_obs.shape
-
-            if col == 'ww_obs':
-                blk = []
-                for region in self.region_ww_obs_list:
-                    df = df_data_train[df_data_train['county'] == region]
-                    blk.append(df[col].to_numpy().astype(np.float32).ravel())
-                self.ww_obs = np.vstack(blk)
-                self.N_obs_regions, self.T = self.ww_obs.shape
 
 
     def _build_adjacency_matrix(self, spatial_net, region_list):
@@ -125,17 +108,6 @@ class SpatialForecaster:
                 # edge rj -> ri, so weight from j -> i
                 M[i, j] = spatial_net[rj][ri]["weight"]
         return jnp.array(M)
-
-    def R_t_func_old(self, T):
-        R0 = numpyro.sample("R0", dist.TruncatedNormal(loc=self.set_R0, scale=0.1, low=0.1))
-
-        eps = numpyro.sample("rw_steps", dist.Normal(loc=jnp.zeros(T), scale=0.005))
-        logR0 = jnp.log(R0)
-        logR_rest = logR0 + jnp.cumsum(eps[:-1])
-        logR = jnp.concatenate([jnp.array([logR0]), logR_rest])
-        R_t = jnp.clip(jnp.exp(logR), 0.01, 2.0)
-        numpyro.deterministic("R_t", R_t)
-        return R_t
 
     def R_t_func(self, T):
         """
@@ -158,7 +130,7 @@ class SpatialForecaster:
         # increments for times 1..T-1 (vector of length T-1)
         eps = numpyro.sample(
             "rw_steps",
-            dist.Normal(loc=0.0, scale=0.005).expand([T - 1])
+            dist.Normal(loc=0.0, scale=0.05).expand([T - 1])
         )
 
         # baseline log R_t over time (shared across regions)
@@ -170,14 +142,32 @@ class SpatialForecaster:
         )  # shape (T,)
 
         # broadcast baseline across regions: (T, N)
-        logR_all = jnp.repeat(logR_base_t[:, None], N, axis=1)
+        if self.Rt_mode == "Global":
+            logR_all = jnp.repeat(logR_base_t[:, None], N, axis=1)
+        
+        if self.Rt_mode == "Local":
+
+            # state intercept deviation
+            sigma_state = numpyro.sample("sigma_state",dist.HalfNormal(0.3))
+
+            state_offset = numpyro.sample("state_offset",
+                dist.Normal(0, sigma_state).expand([N]))
+
+            logR_all = logR_base_t[:, None] + state_offset[None, :]
+
+            # optional state time noise
+            sigma_state_rw = numpyro.sample( "sigma_state_rw", dist.HalfNormal(0.02))
+
+            state_rw = numpyro.sample("state_rw",dist.Normal(0, sigma_state_rw).expand([T, N]))
+
+            logR_all = logR_all + state_rw
 
         # ----- Wastewater effect per region (Option 1:  trend) -----
 
         if self.ww_obs is not None and len(self.region_ww_obs_list) > 0:
             # one global beta_ww (shared across regions)
             beta_ww = numpyro.sample("beta_ww", dist.Normal(0.01, 0.05))
-            beta_ww = jnp.clip(beta_ww, 0, 0.5)
+            beta_ww = jnp.clip(beta_ww, 0, 1)
 
             # assume self.ww_obs and self.ww_quality are lists/arrays
             # indexed in the same order as region_obs_list
@@ -216,8 +206,9 @@ class SpatialForecaster:
 
                     # add wastewater drift to log R for this region
                     logR_all = logR_all.at[:, region_idx].add(beta_ww * ww_cov_full)
+                    ww_idx+=1
 
-                # if region not in region_obs_list, logR_all stays as baseline
+                # if region not in region_ww_obs_list, logR_all stays as baseline
 
         # ----- Final R_t -----
         R_t = jnp.clip(jnp.exp(logR_all), 0.01, 3.0)  # (T, N)
@@ -237,17 +228,27 @@ class SpatialForecaster:
 
         # I[t, i] = infections at time t in region i
         I = jnp.zeros((T, N_regions))
-        I = I.at[0, :].set(I0 / self.region_pop)
+        I = I.at[0, :].set(I0/self.region_pop)
 
         A = self.adj_matrix  # shape (N_regions, N_regions): A[i,j] = weight from j -> i
 
         for t in range(1, T):
             # spatial component: eta_spatial * (A @ I[t-1])
-            neighbor_inf = eta_spatial * (A @ I[t - 1])  # (N_regions,)
-            I_t = R[t] * I[t - 1] + neighbor_inf  # (N_regions,)
+            renewal = jnp.zeros(N_regions)
+
+            # ----- Renewal infection term -----
+            for tau in range(len(self.gen_int_array)):
+                if tau < t:
+                    renewal = renewal + I[t - tau - 1] * self.gen_int_array[tau] 
+
+            renewal = R[t] * renewal
+            # ----- Spatial infection -----
+            neighbor_inf = eta_spatial * (A @ I[t - 1])
+
+            # total infections
+            I_t = renewal + neighbor_inf
             I_t = jnp.clip(I_t, 0.0, 1.0)
             I = I.at[t, :].set(I_t)
-
         I=I*self.region_pop
         numpyro.deterministic("I_t", I)
         return I
@@ -304,62 +305,18 @@ class SpatialForecaster:
             dist.LogNormal(jnp.log(0.5), jnp.log(10.0))
         )
 
-        numpyro.sample("hosp_obs",
-                       dist.NegativeBinomial2(mean=H, concentration=k_hosp),
-                       obs=hosp_obs_v)
+        if hosp_obs_v is not None:
+            weights = jnp.linspace(self.temporal_weights[0], self.temporal_weights[1], H.shape[0])[:, None]  # shape (N_obs_regions, 1)
+            log_lik = dist.NegativeBinomial2(mean=H, concentration=k_hosp).log_prob(hosp_obs_v)
+            numpyro.factor("weighted_likelihood", jnp.sum(weights * log_lik))   
 
+        else:
 
+            numpyro.sample("hosp_obs",
+                            dist.NegativeBinomial2(mean=H, concentration=k_hosp),
+                            obs=hosp_obs_v)
 
-    def waste_water_model(self, T, I, ww_obs_v=None):
-        """
-            Hierarchical G (WW scaling):
-              mu_log_G ~ Normal(log(100), 1.0)
-              sigma_log_G ~ HalfNormal(1.0)
-              log_G[i] ~ Normal(mu_log_G, sigma_log_G)
-              G[i] = exp(log_G[i])
-            """
-
-        s = self.sheddin
-
-        # ---- hyperpriors ----
-        mu_log_G = numpyro.sample(
-            "mu_log_G",
-            dist.Normal(jnp.log(self.set_G), 1.0)
-        )
-        sigma_log_G = numpyro.sample(
-            "sigma_log_G",
-            dist.HalfNormal(1.0)
-        )
-
-        # ---- region-level parameters ----
-        log_G = numpyro.sample(
-            "log_G",
-            dist.Normal(mu_log_G, sigma_log_G).expand([self.N_regions])
-        )
-        G = jnp.exp(log_G)  # WW scale can be > 0 without an upper bound
-
-        # ---- convolution + selection of observed regions (vectorized) ----
-
-        def conv_region(x):
-            return jnp.convolve(x, s, mode="full")
-
-        conv_all = vmap(conv_region, in_axes=1, out_axes=1)(I)
-
-        start = self.n_previous_points
-        conv_trim = conv_all[start:T, :]  # (T, N_regions)
-
-        W_full = (G[None, :] * conv_trim).T  # (N_regions, T)
-
-        idx_obs = [self.region_list.index(r) for r in self.region_obs_list]
-        W = W_full[idx_obs, :]  # (N_obs_regions, T)
-
-        numpyro.deterministic("W_t", W)
-
-        k_ww = numpyro.sample(
-            "k_ww",
-            dist.LogNormal(jnp.log(0.5), jnp.log(10.0))
-        )
-        numpyro.sample("ww_obs", dist.Normal(W, k_ww), obs=ww_obs_v)
+    
 
     def model_test(self, T, hosp_obs_v=None, ww_obs_v=None):
         R = self.R_t_func(T)
@@ -368,8 +325,8 @@ class SpatialForecaster:
 
         I = self.latent_infection_func(R, I0, T, self.N_regions)
 
-        if "hosp_obs" in self.cols_concern:
-            self.Hosptial_admission_model(T, I, hosp_obs_v)
+
+        self.Hosptial_admission_model(T, I, hosp_obs_v)
 
 
     def run_mcmc(self, init_params=None):
