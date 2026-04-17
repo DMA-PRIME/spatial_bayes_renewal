@@ -9,8 +9,8 @@ This package provides two complementary model variants:
 ## Features
 ### Spatial Model
 - **Multi-region Dynamics**: Models disease transmission across connected spatial regions
-- **Spatial Spillover**: Captures disease movement between adjacent regions via adjacency matrices (e.g., NetworkX graphs)
-- **Wastewater Covariate**: Incorporates WW signals per region to modulate transmission
+- **Mobility Network**: Captures human movement between adjacent regions 
+- **Wastewater Data**: Incorporates WW signals per region to modulate transmission
 - **Vectorized Operations**: Efficient JAX-based computation across regions simultaneously
 
 ## Installation
@@ -23,12 +23,6 @@ cd spatial_bayes_renewal
 pip install -e .
 ```
 
-### Install from PyPI (when available)
-
-```bash
-pip install spatial-bayes-renewal
-```
-
 ## Quick Start
 
 ### Classical Model (Single Region)
@@ -39,7 +33,7 @@ from spatial_bayes_renewal import ClassicalForecaster
 # Initialize with single-region data
 forecaster = ClassicalForecaster(
     df_data_train=your_data,
-    cols_concern=['hosp_obs', 'ww_obs'],
+    cols_concern=['hosp_obs', 'ww_obs'], ### if no Wastewater data, use ['hosp_obs'] only
     n_forecast_points=14,
     data_path='/path/to/data',
     pop=1000000,  # population size
