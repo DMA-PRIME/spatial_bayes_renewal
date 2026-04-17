@@ -130,17 +130,14 @@ If you use this package, please cite:
 
 ```bibtex
 @software{luzhong2024bayesian,
-  title={Bayesian Renewal Models for Infectious Disease Forecasting},
-  author={LuZhong},
-  year={2024},
-  url={https://github.com/...}
+  title={A spatial wastewater-informed framework for early prediction of hospital demand for respiratory diseases
+},
+  author={Lu Zhong, Amanda Bleichrodt, Aakash Pandey, Deborah Kunkel, Lior Rennert
+},
+  year={2026},
+  url={...},
 }
 ```
-
-## References
-
-- CDC Pyrenew
---Semi Bayesian model
 
 ## License
 
