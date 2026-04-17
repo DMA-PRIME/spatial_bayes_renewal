@@ -104,13 +104,13 @@ where:
 
 **Choose Classical when:**
 - Analyzing a single city/region
-- Need fast inference with limited data
+- With sufficient data
 - Spatial effects are negligible
 
 **Choose Spatial when:**
-- Multiple regions with connections
+- Analyzing multiple regions
 - Need to account for cross-region transmission
-- Have region-level wastewater data
+- Have insufficient hospital data
 - Building a regional forecasting system
 
 ## Requirements
