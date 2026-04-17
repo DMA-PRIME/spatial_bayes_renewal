@@ -40,7 +40,6 @@ forecaster_spatial = SpatialForecaster(
     cols_concern=['hosp_obs','ww_obs'], 
     n_forecast_points=n_test,  # 4 weeks ahead
     data_path='.',
-    Rt_mode='Local',
     num_samples=200,  # Reduced for speed
     num_warmup=100,
     num_chains=2,  # Use at least 2 chains so R-hat can be checked
