@@ -25,7 +25,7 @@ pip install -e .
 
 ## Quick Start
 
-### Classical Model (Single Region)
+### Spatial Model (Multiple Regions)
 
 ```python
 from spatial_bayes_renewal import ClassicalForecaster, SpatialForecaster
