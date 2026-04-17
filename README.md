@@ -1,13 +1,20 @@
-# Spatial Bayesian Renewal Models for Infectious Disease Forecasting 
+# Bayesian Renewal Models for Infectious Disease Forecasting
 
-Probabilistic framework for forecasting infectious disease dynamics using Bayesian renewal equations.
+A probabilistic framework for forecasting infectious disease dynamics using Bayesian renewal equations with wastewater surveillance data.
 
 This package provides two complementary model variants:
-- **ClassicalForecaster [designed by CDC]**: Non-spatial model for single or aggregated regions
-- **SpatialForecaster [designed in our study]**: Spatial model for multiple regions with spatial coupling
+- **ClassicalForecaster**: Non-spatial model for single or aggregated regions
+- **SpatialForecaster**: Spatial model for multiple connected regions with spillover effects
+
+## Features
+### Spatial Model
+- **Multi-region Dynamics**: Models disease transmission across connected spatial regions
+- **Spatial Spillover**: Captures disease movement between adjacent regions via adjacency matrices (e.g., NetworkX graphs)
+- **Wastewater Covariate**: Incorporates WW signals per region to modulate transmission
+- **Vectorized Operations**: Efficient JAX-based computation across regions simultaneously
 
 ## Installation
-xxxxx
+
 ### Install from source
 
 ```bash
@@ -43,45 +50,8 @@ forecaster = ClassicalForecaster(
 )
 
 # Set required parameters
-forecaster.gen_int_array = generation_interval  # shape (T,)
-forecaster.inf_hosp_array = inf_to_hosp_delay   # shape (D,)
-forecaster.sheddin = viral_shedding_kinetics     # shape (S,)
-
-# Run inference
-samples, predictions = forecaster.run_mcmc()
-```
-
-### Spatial Model (Multiple Regions)
-
-```python
-from spatial_bayes_renewal import SpatialForecaster
-import networkx as nx
-
-# Create spatial network (directed graph of regions)
-G = nx.DiGraph()
-G.add_edge('region1', 'region2', weight=0.5)
-G.add_edge('region2', 'region3', weight=0.3)
-# ... add more edges
-
-# Initialize with multi-region data
-forecaster = SpatialForecaster(
-    df_data=your_data,  # columns: 'county', 'hosp_obs', 'ww_obs'
-    spatial_net=G,
-    region_list=['region1', 'region2', 'region3'],
-    region_obs_list=['region1', 'region2', 'region3'],  # regions with observations
-    cols_concern=['hosp_obs', 'ww_obs'],
-    n_forecast_points=14,
-    data_path='/path/to/data',
-    num_samples=200,
-    num_warmup=100,
-    num_chains=1
-)
-
-# Set required parameters
-forecaster.gen_int_array = generation_interval
-forecaster.inf_hosp_array = inf_to_hosp_delay
-forecaster.sheddin = viral_shedding_kinetics
-forecaster.region_pop = np.array([pop1, pop2, pop3])  # population per region
+forecaster.gen_int_array = generation_interval  
+forecaster.inf_hosp_array = inf_to_hosp_delay 
 
 # Run inference
 samples, predictions = forecaster.run_mcmc()
@@ -130,45 +100,6 @@ where:
 - $\otimes$ = convolution operator
 - $P_{hosp}$, $G$ = hierarchical parameters with hyperpriors
 
-## Data Requirements
-
-### Classical Model Input
-```python
-df_data_train: DataFrame with columns
-  - 'hosp_obs': Hospital admissions (1D array)
-  - 'ww_obs':(optional)  Wastewater concentration (1D array)
-  - 'pop': Population per region
-```
-
-### Spatial Model Input
-```python
-df_data: DataFrame with columns
-  - 'county': Region identifier
-  - 'hosp_obs': Hospital admissions per region
-  - 'ww_obs': (optional)  Wastewater concentration per region
-  - 'G': Spatial network connecting regions
-  - 'pop': Population per region
-```
-
-## Key Parameters
-
-### Both Models
-- `cols_concern`: List of observation types to include
-- `n_forecast_points`: Number of time steps to forecast ahead
-- `num_samples`: MCMC samples to draw (default: 200)
-- `num_warmup`: MCMC burn-in iterations (default: 100)
-- `num_chains`: Parallel chains to run (default: 2 for classical, 1 for spatial)
-
-### Classical-specific
-- `pop`: Total population size
-- `Renewal_infection_case`: Infection dynamics model type
-
-### Spatial-specific
-- `spatial_net`: NetworkX graph of region connectivity
-- `region_list`: All regions in model
-- `region_obs_list`: Subset with observations (creates hierarchical structure)
-- `region_pop`: Population per region (array)
-
 ## Model Comparison
 
 | Feature | Classical | Spatial |
@@ -176,35 +107,31 @@ df_data: DataFrame with columns
 | Regions | Single/aggregate | Multiple |
 | Spatial Effects | No | Yes (adjacency matrix) |
 | Wastewater | Yes | Yes (per region) |
-| Scalability | high | High  |
-| Inference Speed | Slow if for each region | Fast |
-| Complexity | High if for each region | Moderate |
+| Scalability | Very high | High (linear in regions) |
+| Inference Speed | Fast | Medium |
+| Complexity | Simple | Moderate |
 
 **Choose Classical when:**
 - Analyzing a single city/region
-- Spatial effects are not available
+- Need fast inference with limited data
+- Spatial effects are negligible
 
 **Choose Spatial when:**
 - Multiple regions with connections
 - Need to account for cross-region transmission
-- Have region-level biased wastewater data
+- Have region-level wastewater data
 - Building a regional forecasting system
-- Data is sparse and limited
 
-## Output
+## Requirements
 
-`run_mcmc()` returns:
-```python
-samples, predictions = forecaster.run_mcmc()
+- Python >= 3.9
+- numpy
+- polars
+- jax >= 0.3.0
+- jaxlib >= 0.3.0
+- numpyro >= 0.10.0
+- matplotlib
 
-# samples: Dictionary of posterior samples
-#   Keys: 'R0', 'R_t', 'I_t', 'P_hosp', 'G', 'k_hosp', 'k_ww', etc.
-#   Values: Arrays of shape (num_chains * num_samples, ...)
-
-# predictions: Posterior predictive samples for forecast period
-#   Keys: 'I_t', 'H_t', 'W_t', 'R_t', etc.
-#   Values: Arrays of shape (num_samples, forecast_len, ...)
-```
 
 ## Citation
 
@@ -212,20 +139,22 @@ If you use this package, please cite:
 
 ```bibtex
 @software{luzhong2024bayesian,
-  title={Bayesian Renewal Models xxxxx},
-  author={LuZhong, xxxxx},
-  year={2026},
-  journal={xxx}
+  title={Bayesian Renewal Models for Infectious Disease Forecasting},
+  author={LuZhong},
+  year={2024},
+  url={https://github.com/...}
 }
 ```
 
-## Acknowledgement
-This work is supproted by DMA-PRIME (CDC/CFA Insight Net Center of Integration)
+## References
+
+- CDC Pyrenew
+--Semi Bayesian model
 
 ## License
 
 MIT License - see LICENSE file for details
 
+## Support
 
-
-
+For issues, questions, or feature requests, please open an issue on GitHub or contact the development team.
