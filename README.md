@@ -28,27 +28,33 @@ pip install -e .
 ### Classical Model (Single Region)
 
 ```python
-from spatial_bayes_renewal import ClassicalForecaster
+from spatial_bayes_renewal import ClassicalForecaster, SpatialForecaster
 
-# Initialize with single-region data
-forecaster = ClassicalForecaster(
-    df_data_train=your_data,
-    cols_concern=['hosp_obs', 'ww_obs'], ### if no Wastewater data, use ['hosp_obs'] only
-    n_forecast_points=14,
-    data_path='/path/to/data',
-    pop=1000000,  # population size
-    Renewal_infection_case='Basic',  # 'Basic', 'Feedback', or 'Logistic_S'
-    num_samples=200,
+# Initialize with multiple-region data
+forecaster_spatial = SpatialForecaster(
+    df_data=df_train,
+    spatial_net=net_mobility,   ### mobility network
+    region_list=region_list,    ### region list
+    region_obs_list=region_list,  # Use regions for hospital observations
+    region_ww_obs_list=region_ww,   # Use  regions for ww observations
+    cols_concern=['hosp_obs','ww_obs'], 
+    n_forecast_points=n_test,  # 4 weeks ahead
+    data_path='.',
+    Rt_mode='Local',
+    num_samples=200,  # Reduced for speed
     num_warmup=100,
-    num_chains=2
+    num_chains=2,  # Use at least 2 chains so R-hat can be checked
+    progress_bar=True,
+    print_summary=True  # Print MCMC diagnostics (R-hat, n_eff, divergences)
 )
 
 # Set required parameters
-forecaster.gen_int_array = generation_interval  
-forecaster.inf_hosp_array = inf_to_hosp_delay 
+forecaster_spatial.gen_int_array = generation_interval  
+forecaster_spatial.inf_hosp_array = inf_to_hosp_delay
+forecaster_spatial.region_pop=region_pop
 
 # Run inference
-samples, predictions = forecaster.run_mcmc()
+samples_spatial, predictions_spatial = forecaster_spatial.run_mcmc()
 ```
 
 ## Model Details
