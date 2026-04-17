@@ -129,7 +129,7 @@ where:
 If you use this package, please cite:
 
 ```bibtex
-@software{luzhong2024bayesian,
+@article{luzhong2024bayesian,
   title={A spatial wastewater-informed framework for early prediction of hospital demand for respiratory diseases
 },
   author={Lu Zhong, Amanda Bleichrodt, Aakash Pandey, Deborah Kunkel, Lior Rennert
