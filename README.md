@@ -53,7 +53,7 @@ samples, predictions = forecaster.run_mcmc()
 
 ## Model Details
 
-### Classical Renewal Model
+### Classical Bayesian Renewal Model
 
 The classical model implements the renewal equation:
 
@@ -69,9 +69,9 @@ where:
 - **Feedback**: Includes negative feedback based on prior infections
 - **Logistic_S**: Accounts for susceptible depletion in finite populations
 
-### Spatial Renewal Model
+### Spatial Bayesian Renewal Model
 
-Extends classical model with spatial spillover:
+Extends the classical model with a mobility network:
 
 $$I_{t,i} = R_{t,i} \sum_{\tau < t} I_{t-\tau,i} g(\tau) + \eta_{spatial} \sum_{j} A_{ij} I_{t-1,j}$$
 
