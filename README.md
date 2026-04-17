@@ -85,14 +85,11 @@ where:
 **Hospital Admissions:**
 $$h(t) \sim \text{NegativeBinomial2}(\mu=P_{hosp} * (I \otimes d), k)$$
 
-**Wastewater:**
-$$w(t) \sim \text{Normal}(\mu=G * (I \otimes s), \sigma=k_{ww})$$
 
 where:
 - $d$ = infection-to-hospitalization delay distribution
-- $s$ = viral shedding kinetics
 - $\otimes$ = convolution operator
-- $P_{hosp}$, $G$ = hierarchical parameters with hyperpriors
+- $P_{hosp}$= hierarchical parameters with hyperpriors
 
 ## Model Comparison
 
